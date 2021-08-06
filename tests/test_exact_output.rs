@@ -46,14 +46,18 @@ fn initialize() {
     });
 }
 
-fn exact_output_test<T: AsRef<OsStr>>(valid_outputs: Vec<String>, command_args : Vec<T>) {
+fn initialize_and_build_command<T: AsRef<OsStr>>(command_args: Vec<T>) -> String {
     initialize();
 
     let mut a = &mut Command::cargo_bin("dust").unwrap();
     for p in command_args {
         a = a.arg(p);
     }
-    let output : String = str::from_utf8(&a.unwrap().stdout).unwrap().into();
+    str::from_utf8(&a.unwrap().stdout).unwrap().into()
+}
+
+fn exact_output_test<T: AsRef<OsStr>>(valid_outputs: Vec<String>, command_args: Vec<T>) {
+    let output = initialize_and_build_command(command_args);
 
     assert!(valid_outputs
         .iter()
@@ -134,16 +138,17 @@ fn main_output_long_paths() -> Vec<String> {
 #[cfg_attr(target_os = "windows", ignore)]
 #[test]
 pub fn test_apparent_size() {
+    // Check the '-s' Flag gives us byte sizes and that it doesn't round up to a block
     let command_args = vec!["-c", "-s", "/tmp/test_dir"];
-    exact_output_test(output_apparent_size(), command_args);
-}
+    let output = initialize_and_build_command(command_args);
 
-fn output_apparent_size() -> Vec<String> {
-    // The directory sizes vary a lot based on what the underlying filesystem is
-    // so different distros give different results. Really we should be checking that
-    // the standard '4.0K' isn't there
-    let apparent_size = "6B     ├── hello_file│".into();
-    vec![apparent_size]
+    let apparent_size1 = "6B     ├── hello_file│";
+    let apparent_size2 = "0B     ┌── a_file";
+    assert!(output.contains(apparent_size1));
+    assert!(output.contains(apparent_size2));
+
+    let incorrect_apparent_size = "4.0K     ├── hello_file";
+    assert!(!output.contains(incorrect_apparent_size));
 }
 
 // Check against directories and files whos names are substrings of each other
