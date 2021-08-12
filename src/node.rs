@@ -1,6 +1,7 @@
 use crate::platform::get_metadata;
 
 use std::cmp::Ordering;
+use std::collections::HashSet;
 use std::path::PathBuf;
 
 #[derive(Debug, Eq, Clone)]
@@ -14,19 +15,32 @@ pub struct Node {
 pub fn build_node(
     dir: PathBuf,
     children: Vec<Node>,
+    filtered_extensions: &HashSet<&str>,
     use_apparent_size: bool,
     is_symlink: bool,
     by_filecount: bool,
 ) -> Option<Node> {
     match get_metadata(&dir, use_apparent_size) {
         Some(data) => {
-            let (size, inode_device) = if by_filecount {
+            let (mut size, inode_device) = if by_filecount {
                 (1, data.1)
             } else if is_symlink && !use_apparent_size {
                 (0, None)
             } else {
                 data
             };
+
+            if !filtered_extensions.is_empty()
+                && !filtered_extensions.contains(
+                    &dir.extension()
+                        .unwrap_or_default()
+                        .to_string_lossy()
+                        .into_owned()
+                        .as_ref(),
+                )
+            {
+                size = 0;
+            }
 
             Some(Node {
                 name: dir,

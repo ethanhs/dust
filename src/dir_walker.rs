@@ -15,8 +15,9 @@ use std::fs::DirEntry;
 
 use crate::platform::get_metadata;
 
-pub struct WalkData {
+pub struct WalkData<'a> {
     pub ignore_directories: HashSet<PathBuf>,
+    pub filtered_extensions: HashSet<&'a str>,
     pub allowed_filesystems: HashSet<u64>,
     pub use_apparent_size: bool,
     pub by_filecount: bool,
@@ -84,6 +85,21 @@ fn ignore_file(entry: &DirEntry, walk_data: &WalkData) -> bool {
             }
         }
     }
+    if !walk_data.filtered_extensions.is_empty() && entry.path().is_file() {
+        // If this file extension is not on our approved list
+        if !walk_data.filtered_extensions.contains(
+            &entry
+                .path()
+                .extension()
+                .unwrap_or_default()
+                .to_string_lossy()
+                .into_owned()
+                .as_ref(),
+        ) {
+            return true;
+        }
+    }
+
     (is_dot_file && walk_data.ignore_hidden) || is_ignored_path
 }
 
@@ -110,6 +126,7 @@ fn walk(dir: PathBuf, permissions_flag: &AtomicBool, walk_data: &WalkData) -> Op
                             return build_node(
                                 entry.path(),
                                 vec![],
+                                &walk_data.filtered_extensions,
                                 walk_data.use_apparent_size,
                                 data.is_symlink(),
                                 walk_data.by_filecount,
@@ -128,6 +145,7 @@ fn walk(dir: PathBuf, permissions_flag: &AtomicBool, walk_data: &WalkData) -> Op
     build_node(
         dir,
         children,
+        &walk_data.filtered_extensions,
         walk_data.use_apparent_size,
         false,
         walk_data.by_filecount,
